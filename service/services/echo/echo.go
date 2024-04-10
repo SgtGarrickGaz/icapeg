@@ -16,14 +16,15 @@ import (
 func (e *Echo) Processing(partial bool, IcapHeader textproto.MIMEHeader) (int, interface{}, map[string]string, map[string]interface{},
 	map[string]interface{}, map[string]interface{}) {
 	serviceHeaders := make(map[string]string)
-	serviceHeaders["X-ICAP-Metadata"] = e.xICAPMetadata
-	msgHeadersBeforeProcessing := e.generalFunc.LogHTTPMsgHeaders(e.methodName)
+	serviceHeaders["X-ICAP-Metadata"] = e.xICAPMetadata                         //Adds ICAP Metadata to headers
+	msgHeadersBeforeProcessing := e.generalFunc.LogHTTPMsgHeaders(e.methodName) //Gets the message headers
 	msgHeadersAfterProcessing := make(map[string]interface{})
 	vendorMsgs := make(map[string]interface{})
 	logging.Logger.Info(utils.PrepareLogMsg(e.xICAPMetadata, e.serviceName+" service has started processing"))
 
 	// no need to scan part of the file, this service needs all the file at ine time
 	if partial {
+		fmt.Println(partial)
 		logging.Logger.Info(utils.PrepareLogMsg(e.xICAPMetadata,
 			e.serviceName+" service has stopped processing partially"))
 		return utils.Continue, nil, nil, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
@@ -32,10 +33,11 @@ func (e *Echo) Processing(partial bool, IcapHeader textproto.MIMEHeader) (int, i
 
 	//extracting the file from http message
 	file, reqContentType, err := e.generalFunc.CopyingFileToTheBuffer(e.methodName)
+	fmt.Println(file)
 	if err != nil {
 		logging.Logger.Error(utils.PrepareLogMsg(e.xICAPMetadata, e.serviceName+" error: "+err.Error()))
 		logging.Logger.Info(utils.PrepareLogMsg(e.xICAPMetadata, e.serviceName+" service has stopped processing"))
-		return utils.InternalServerErrStatusCodeStr, nil, serviceHeaders,
+		return utils.InternalServerErrStatusCodeStr /* 500 error code */, nil, serviceHeaders,
 			msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 	}
 

@@ -177,10 +177,8 @@ func (f *GeneralFunc) IsBodyGzipCompressed(methodName string) bool {
 	switch methodName {
 	case utils.ICAPModeReq:
 		return f.httpMsg.Request.Header.Get("Content-Encoding") == "gzip"
-		break
 	case utils.ICAPModeResp:
 		return f.httpMsg.Response.Header.Get("Content-Encoding") == "gzip"
-		break
 	}
 	return false
 }

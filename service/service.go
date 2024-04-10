@@ -5,6 +5,7 @@ import (
 	"icapeg/logging"
 	"icapeg/service/services/clamav"
 	"icapeg/service/services/clhashlookup"
+	"icapeg/service/services/downloader"
 	"icapeg/service/services/echo"
 	"net/textproto"
 )
@@ -14,6 +15,7 @@ const (
 	VendorEcho       = "echo"
 	VendorClamav     = "clamav"
 	VendorHashlookup = "clhashlookup"
+	VendorDownloader = "downloader"
 )
 
 type (
@@ -36,6 +38,8 @@ func GetService(vendor, serviceName, methodName string, httpMsg *http_message.Ht
 		return clhashlookup.NewHashlookupService(serviceName, methodName, httpMsg, xICAPMetadata)
 	case VendorClamav:
 		return clamav.NewClamavService(serviceName, methodName, httpMsg, xICAPMetadata)
+	case VendorDownloader:
+		return downloader.NewDownloaderService(serviceName, methodName, httpMsg, xICAPMetadata)
 
 	}
 	return nil
@@ -51,5 +55,7 @@ func InitServiceConfig(vendor, serviceName string) {
 		clhashlookup.InitHashlookupConfig(serviceName)
 	case VendorClamav:
 		clamav.InitClamavConfig(serviceName)
+	case VendorDownloader:
+		downloader.InitDownloadConfig(serviceName)
 	}
 }

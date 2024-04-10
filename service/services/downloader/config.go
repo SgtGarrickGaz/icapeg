@@ -1,4 +1,4 @@
-package echo
+package downloader
 
 import (
 	http_message "icapeg/http-message"
@@ -7,17 +7,17 @@ import (
 	services_utilities "icapeg/service/services-utilities"
 	general_functions "icapeg/service/services-utilities/general-functions"
 	"sync"
+	//"time"
 )
 
 var doOnce sync.Once
-var echoConfig *Echo
+var DownloaderConfig *Downloader
 
-const EchoIdentifier = "ECHO ID"
-
-// Echo represents the information regarding the Echo service
-type Echo struct {
-	xICAPMetadata              string
-	httpMsg                    *http_message.HttpMsg
+// Downloader represents the information regarding the Downloader service
+type Downloader struct {
+	xICAPMetadata string
+	httpMsg       *http_message.HttpMsg
+	//elapsed                    time.Duration
 	serviceName                string
 	methodName                 string
 	maxFileSize                int
@@ -30,10 +30,10 @@ type Echo struct {
 	generalFunc                *general_functions.GeneralFunc
 }
 
-func InitEchoConfig(serviceName string) {
+func InitDownloadConfig(serviceName string) {
 	logging.Logger.Debug("loading " + serviceName + " service configurations")
 	doOnce.Do(func() {
-		echoConfig = &Echo{
+		DownloaderConfig = &Downloader{
 			maxFileSize:                readValues.ReadValuesInt(serviceName + ".max_filesize"),
 			bypassExts:                 readValues.ReadValuesSlice(serviceName + ".bypass_extensions"),
 			processExts:                readValues.ReadValuesSlice(serviceName + ".process_extensions"),
@@ -41,24 +41,24 @@ func InitEchoConfig(serviceName string) {
 			returnOrigIfMaxSizeExc:     readValues.ReadValuesBool(serviceName + ".return_original_if_max_file_size_exceeded"),
 			return400IfFileExtRejected: readValues.ReadValuesBool(serviceName + ".return_400_if_file_ext_rejected"),
 		}
-		echoConfig.extArrs = services_utilities.InitExtsArr(echoConfig.processExts, echoConfig.rejectExts, echoConfig.bypassExts)
+		DownloaderConfig.extArrs = services_utilities.InitExtsArr(DownloaderConfig.processExts, DownloaderConfig.rejectExts, DownloaderConfig.bypassExts)
 	})
 }
 
-// NewEchoService returns a new populated instance of the Echo service
-func NewEchoService(serviceName, methodName string, httpMsg *http_message.HttpMsg, xICAPMetadata string) *Echo {
-	return &Echo{
+// NewDownloaderService returns a new populated instance of the Downloader service
+func NewDownloaderService(serviceName, methodName string, httpMsg *http_message.HttpMsg, xICAPMetadata string) *Downloader {
+	return &Downloader{
 		xICAPMetadata:              xICAPMetadata,
 		httpMsg:                    httpMsg,
 		serviceName:                serviceName,
 		methodName:                 methodName,
 		generalFunc:                general_functions.NewGeneralFunc(httpMsg, xICAPMetadata),
-		maxFileSize:                echoConfig.maxFileSize,
-		bypassExts:                 echoConfig.bypassExts,
-		processExts:                echoConfig.processExts,
-		rejectExts:                 echoConfig.rejectExts,
-		extArrs:                    echoConfig.extArrs,
-		returnOrigIfMaxSizeExc:     echoConfig.returnOrigIfMaxSizeExc,
-		return400IfFileExtRejected: echoConfig.return400IfFileExtRejected,
+		maxFileSize:                DownloaderConfig.maxFileSize,
+		bypassExts:                 DownloaderConfig.bypassExts,
+		processExts:                DownloaderConfig.processExts,
+		rejectExts:                 DownloaderConfig.rejectExts,
+		extArrs:                    DownloaderConfig.extArrs,
+		returnOrigIfMaxSizeExc:     DownloaderConfig.returnOrigIfMaxSizeExc,
+		return400IfFileExtRejected: DownloaderConfig.return400IfFileExtRejected,
 	}
 }
