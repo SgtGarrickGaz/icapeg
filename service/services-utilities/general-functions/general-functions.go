@@ -13,7 +13,6 @@ import (
 	"icapeg/service/services-utilities/ContentTypes"
 	"image"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"path"
 	"strconv"
@@ -60,10 +59,8 @@ func (f *GeneralFunc) CopyingFileToTheBuffer(methodName string) (*bytes.Buffer, 
 	switch methodName {
 	case utils.ICAPModeReq:
 		file, reqContentType, err = f.copyingFileToTheBufferReq()
-		break
 	case utils.ICAPModeResp:
 		file, err = f.copyingFileToTheBufferResp()
-		break
 	}
 	if err != nil {
 		return nil, nil, err
@@ -186,9 +183,9 @@ func (f *GeneralFunc) IsBodyGzipCompressed(methodName string) bool {
 // DecompressGzipBody is a func used for decompress files which compressed in Gzip
 func (f *GeneralFunc) DecompressGzipBody(file *bytes.Buffer) (*bytes.Buffer, error) {
 	logging.Logger.Info(utils.PrepareLogMsg(f.xICAPMetadata, "decompressing the HTTP message body"))
-	reader, err := gzip.NewReader(file)
+	reader, _ := gzip.NewReader(file)
 	defer reader.Close()
-	result, err := ioutil.ReadAll(reader)
+	result, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +200,7 @@ func (f *GeneralFunc) ReqModErrPage(reason, serviceName, IdentifierId string, fi
 	f.httpMsg.Request.URL.Opaque = url
 	f.httpMsg.Request.URL.Path = ""
 	f.httpMsg.Request.URL.Host = host
-	for key, _ := range f.httpMsg.Request.Header {
+	for key := range f.httpMsg.Request.Header {
 		f.httpMsg.Request.Header.Del(key)
 	}
 	reqUri := f.httpMsg.Request.RequestURI
@@ -447,10 +444,8 @@ func (f *GeneralFunc) GetDecodedImage(file *bytes.Buffer) (image.Image, error) {
 
 // InitSecure set insecure flag based on user input
 func (f *GeneralFunc) InitSecure(VerifyServerCert bool) bool {
-	if !VerifyServerCert {
-		return true
-	}
-	return false
+
+	return !VerifyServerCert
 }
 
 // GetMimeExtension returns the mime type extension of the data

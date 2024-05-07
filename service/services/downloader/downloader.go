@@ -1,28 +1,30 @@
 package downloader
 
 import (
+	"bufio"
+	"bytes"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
 	utils "icapeg/consts"
 	"io"
 	"net/http"
 	"net/textproto"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
-// NewDownloaderService creates a new instance of DownloaderService
-
-// DownloadFile downloads a file using the provided URL
 func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (int, interface{}, map[string]string, map[string]interface{}, map[string]interface{}, map[string]interface{}) {
 	/* This function returns the following types:
-	   int,
-	   interface{},
-	   map[string]string,
-	   map[string]interface{},
-	   map[string]interface{},
-	   map[string]interface{}
+	   int => Status Code,
+	   interface{} => Http Message with File (if exists),
+	   map[string]string => Service Headers
+	   map[string]interface{} => Message Headers Before Processing,
+	   map[string]interface{} => Message Headers After Processing,,
+	   map[string]interface{} => Vendor Messages
 	*/
 	serviceHeaders := make(map[string]string)
 	serviceHeaders["X-ICAP-Metadata"] = d.xICAPMetadata
@@ -33,18 +35,11 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 
 	if partial {
 		fmt.Println("Partial file found")
-		return utils.Continue, nil, nil, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
+		return utils.Continue, nil, nil, msgHeadersBeforeProcessing, msgHeadersBeforeProcessing, vendorMsgs
 	}
 
-	file, _, err := d.generalFunc.CopyingFileToTheBuffer(d.methodName)
-
-	// if d.methodName == utils.ICAPModeResp {
-	// 	fmt.Println("Response Headers: ", d.httpMsg.Response.Header)
-	// }
-
-	// if d.methodName == utils.ICAPModeReq {
-	// 	fmt.Println("Request Headers", d.httpMsg.Request.Header)
-	// }
+	file, reqContentType, err := d.generalFunc.CopyingFileToTheBuffer(d.methodName)
+	fileSize := fmt.Sprintf("%v", file.Len())
 
 	if err != nil {
 		fmt.Println("Error while copying file to the buffer", err.Error())
@@ -52,11 +47,32 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 			msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 	}
 
-	if d.httpMsg.Request.Method == http.MethodConnect || d.httpMsg.Request.Method == http.MethodOptions {
-
-		return utils.NoModificationStatusCodeStr, nil, serviceHeaders, msgHeadersBeforeProcessing, msgHeadersBeforeProcessing, vendorMsgs
+	// if method is connect, send 200 status code.
+	if d.httpMsg.Request.Method == http.MethodConnect {
+		return utils.OkStatusCodeStr, d.generalFunc.ReturningHttpMessageWithFile(d.methodName, file.Bytes()), serviceHeaders, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 	}
 
+	var contentType []string
+
+	var fileName string
+	if d.methodName == utils.ICAPModeReq {
+		contentType = d.httpMsg.Request.Header["Content-Type"]
+		fileName = d.generalFunc.GetFileName()
+		// fmt.Println(fileName, contentType)
+	} else {
+		contentType = d.httpMsg.Response.Header["Content-Type"]
+		fileName = d.generalFunc.GetFileName()
+		// fmt.Println(fileName, contentType)
+	}
+	if len(contentType) == 0 {
+		contentType = append(contentType, "")
+	}
+
+	isGzip := d.generalFunc.IsBodyGzipCompressed(d.methodName)
+
+	fileExtension := d.generalFunc.GetMimeExtension(file.Bytes(), contentType[0], fileName)
+
+	// calculates the sha256 hash of the file
 	hash := sha256.New()
 	f := file
 	_, err = hash.Write(f.Bytes())
@@ -64,30 +80,58 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 		fmt.Println("Error writing the hash", err.Error())
 		return utils.OkStatusCodeStr, nil, serviceHeaders, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 	}
-
 	fileHash := hex.EncodeToString(hash.Sum([]byte(nil)))
 
-	if fileHash == "8edd24caa90641caecf8d4056556ba896da52ceed043e99da3071bb74d1a304d" {
-		fmt.Println("Hash found")
-		htmlPage, req, err := d.generalFunc.ReqModErrPage(utils.ErrPageReasonFileIsNotSafe, d.serviceName, fileHash, string(rune(file.Len())))
-		if err != nil {
-
-			return utils.InternalServerErrStatusCodeStr, nil, nil,
-				msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
-		}
-		req.Body = io.NopCloser(htmlPage)
+	//check if the file extension is a bypass extension
+	//if yes we will not modify the file, and we will return 204 No modifications
+	isProcess, icapStatus, httpMsg := d.generalFunc.CheckTheExtension(fileExtension, d.extArrs,
+		d.processExts, d.rejectExts, d.bypassExts, d.return400IfFileExtRejected, isGzip,
+		d.serviceName, d.methodName, fileHash, d.httpMsg.Request.RequestURI, reqContentType, file, utils.BlockPagePath, fileSize)
+	if !isProcess {
 		msgHeadersAfterProcessing = d.generalFunc.LogHTTPMsgHeaders(d.methodName)
-		return utils.OkStatusCodeStr, req, serviceHeaders,
+		return icapStatus, httpMsg, serviceHeaders,
 			msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 	}
 
+	// compares the file hash to the given hashes
+	//TODO: Implement hash lookup functionality
+	var isBlocked, fileOpeningError = checkHashInFile(fileHash)
+	if fileOpeningError != nil {
+		return 204, d.generalFunc.ReturningHttpMessageWithFile(d.methodName, nil), serviceHeaders, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
+	}
+
+	if isBlocked {
+		fmt.Println("Hash found")
+		if d.methodName == utils.ICAPModeResp {
+
+			errPage := d.generalFunc.GenHtmlPage("block-page.html", utils.ErrPageReasonAccessProhibited, d.serviceName, fileHash, d.httpMsg.Request.RequestURI, "0", d.xICAPMetadata)
+			d.httpMsg.Response = d.generalFunc.ErrPageResp(403, errPage.Len())
+			d.httpMsg.Response.Body = io.NopCloser(bytes.NewBuffer(errPage.Bytes()))
+
+			msgHeadersAfterProcessing = d.generalFunc.LogHTTPMsgHeaders(d.methodName)
+			return utils.OkStatusCodeStr, d.httpMsg.Response, serviceHeaders,
+				msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
+
+		} else {
+			htmlPage, req, err := d.generalFunc.ReqModErrPage(utils.ErrPageReasonAccessProhibited, d.serviceName, fileHash, "0")
+			if err != nil {
+				fmt.Println(err.Error())
+				return utils.InternalServerErrStatusCodeStr, nil, nil,
+					msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
+			}
+			req.Body = io.NopCloser(htmlPage)
+			msgHeadersAfterProcessing = d.generalFunc.LogHTTPMsgHeaders(d.methodName)
+			return utils.OkStatusCodeStr, req, serviceHeaders,
+				msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
+		}
+
+	}
+
+	//returns the file if other cases are false
+	// default return case
 	scannedFile := f.Bytes()
-	// scannedFile = d.generalFunc.PreparingFileAfterScanning(scannedFile, reqContentType, d.methodName)
 	msgHeadersAfterProcessing = d.generalFunc.LogHTTPMsgHeaders(d.methodName)
 	fmt.Println("fileHash:", fileHash)
-	// if d.methodName == utils.ICAPModeReq {
-	// 	return utils.Continue, d.httpMsg, serviceHeaders, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
-	// }
 
 	return 204, d.generalFunc.ReturningHttpMessageWithFile(d.methodName, scannedFile), serviceHeaders, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 
@@ -96,4 +140,33 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 func (e *Downloader) ISTagValue() string {
 	epochTime := strconv.FormatInt(time.Now().Unix(), 10)
 	return "epoch-" + epochTime
+}
+
+// returns true if hash found else returns false
+func checkHashInFile(targetValue string) (bool, error) {
+	file, err := os.Open("./hashlist.txt")
+
+	if err != nil {
+		return false, err
+	}
+
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		trimmedLine := strings.TrimSpace(line)
+		trimmedLine = strings.ToLower(trimmedLine)
+		targetValue = strings.ToLower(targetValue)
+
+		// compares the two hashes and returns 1 if they match else it returns 0
+		if subtle.ConstantTimeCompare([]byte(trimmedLine), []byte(targetValue)) == 1 {
+			return true, nil
+		}
+
+		if err := scanner.Err(); err != nil {
+			return false, err
+		}
+
+	}
+	return false, nil
 }
