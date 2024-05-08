@@ -103,7 +103,7 @@ shadow_service=false
 preview_bytes = "1024" #byte
 preview_enabled = true# options send preview header or not
 process_extensions = ["pdf"] # * = everything except the ones in bypass, unknown = system couldn't find out the type of the file
-reject_extensions = ["html","css"]
+reject_extensions = []
 bypass_extensions = ["*"]
 #max file size value from 1 to 9223372036854775807, and value of zero means unlimited
 max_filesize = 0 #bytes

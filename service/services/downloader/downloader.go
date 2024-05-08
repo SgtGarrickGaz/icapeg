@@ -35,7 +35,7 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 
 	if partial {
 		fmt.Println("Partial file found")
-		return utils.Continue, nil, nil, msgHeadersBeforeProcessing, msgHeadersBeforeProcessing, vendorMsgs
+		return utils.Continue, nil, nil, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 	}
 
 	file, reqContentType, err := d.generalFunc.CopyingFileToTheBuffer(d.methodName)
@@ -47,9 +47,10 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 			msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 	}
 
-	// if method is connect, send 200 status code.
+	// if method is connect, send 204 status code.
 	if d.httpMsg.Request.Method == http.MethodConnect {
-		return utils.OkStatusCodeStr, d.generalFunc.ReturningHttpMessageWithFile(d.methodName, file.Bytes()), serviceHeaders, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
+		return utils.NoModificationStatusCodeStr, d.generalFunc.ReturningHttpMessageWithFile(d.methodName, file.Bytes()),
+			serviceHeaders, msgHeadersBeforeProcessing, msgHeadersBeforeProcessing, vendorMsgs
 	}
 
 	var contentType []string
