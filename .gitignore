@@ -29,3 +29,5 @@ logs
 # Env file
 app.env
 .vscode
+
+hashlist.txt

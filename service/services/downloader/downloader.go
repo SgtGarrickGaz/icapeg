@@ -26,6 +26,7 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 	   map[string]interface{} => Message Headers After Processing,,
 	   map[string]interface{} => Vendor Messages
 	*/
+
 	serviceHeaders := make(map[string]string)
 	serviceHeaders["X-ICAP-Metadata"] = d.xICAPMetadata
 	msgHeadersBeforeProcessing := d.generalFunc.LogHTTPMsgHeaders(d.methodName)
@@ -38,23 +39,25 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 		return utils.Continue, nil, nil, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 	}
 
+	// Copies the file to the buffer and calculates the file size.
 	file, reqContentType, err := d.generalFunc.CopyingFileToTheBuffer(d.methodName)
 	fileSize := fmt.Sprintf("%v", file.Len())
 
+	// If Error exists, return 500 status code
 	if err != nil {
 		fmt.Println("Error while copying file to the buffer", err.Error())
-		return utils.InternalServerErrStatusCodeStr /* 500 error code */, nil, serviceHeaders,
+		return utils.InternalServerErrStatusCodeStr, nil, serviceHeaders,
 			msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 	}
 
-	// if method is connect, send 204 status code.
+	// if Method is connect, return 204 status code.
 	if d.httpMsg.Request.Method == http.MethodConnect {
 		return utils.NoModificationStatusCodeStr, d.generalFunc.ReturningHttpMessageWithFile(d.methodName, file.Bytes()),
 			serviceHeaders, msgHeadersBeforeProcessing, msgHeadersBeforeProcessing, vendorMsgs
 	}
 
+	// Gets Content Type and File Name.
 	var contentType []string
-
 	var fileName string
 	if d.methodName == utils.ICAPModeReq {
 		contentType = d.httpMsg.Request.Header["Content-Type"]
@@ -94,30 +97,36 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 			msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 	}
 
-	// compares the file hash to the given hashes
-	//TODO: Implement hash lookup functionality
+	//  Checks the hash of the file.
 	var isBlocked, fileOpeningError = checkHashInFile(fileHash)
+
+	// If there is an error opening the hash list file
 	if fileOpeningError != nil {
 		return 204, d.generalFunc.ReturningHttpMessageWithFile(d.methodName, nil), serviceHeaders, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 	}
 
+	// If hash is found in file.
 	if isBlocked {
 		fmt.Println("Hash found")
+
+		// If the file is an ICAP RESPMOD.
 		if d.methodName == utils.ICAPModeResp {
 
-			errPage := d.generalFunc.GenHtmlPage("block-page.html", utils.ErrPageReasonAccessProhibited, d.serviceName, fileHash, d.httpMsg.Request.RequestURI, "0", d.xICAPMetadata)
+			//creates the error page and adds that in the Response Body
+			errPage := d.generalFunc.GenHtmlPage(utils.BlockPagePath, utils.ErrPageReasonAccessProhibited, d.serviceName, fileHash, d.httpMsg.Request.RequestURI, "4096", d.xICAPMetadata)
 			d.httpMsg.Response = d.generalFunc.ErrPageResp(403, errPage.Len())
 			d.httpMsg.Response.Body = io.NopCloser(bytes.NewBuffer(errPage.Bytes()))
-
 			msgHeadersAfterProcessing = d.generalFunc.LogHTTPMsgHeaders(d.methodName)
 			return utils.OkStatusCodeStr, d.httpMsg.Response, serviceHeaders,
 				msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 
 		} else {
-			htmlPage, req, err := d.generalFunc.ReqModErrPage(utils.ErrPageReasonAccessProhibited, d.serviceName, fileHash, "0")
+			fmt.Println("Unauthorized access:", d.httpMsg.Request.RemoteAddr, "File Hash:", fileHash)
+			htmlPage, req, err := d.generalFunc.ReqModErrPage(utils.ErrPageReasonAccessProhibited, d.serviceName, fileHash, "4096")
+
 			if err != nil {
 				fmt.Println(err.Error())
-				return utils.InternalServerErrStatusCodeStr, nil, nil,
+				return 403, d.generalFunc.ReturningHttpMessageWithFile(d.methodName, htmlPage.Bytes()), nil,
 					msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 			}
 			req.Body = io.NopCloser(htmlPage)
