@@ -1,13 +1,17 @@
 package database
 
-import "os"
+import (
+	"os"
+)
+
+var DBFile *os.File
 
 func NewDatabase(fileDir string) (*os.File, error) {
-	file, err := os.OpenFile(fileDir, os.O_RDONLY|os.O_CREATE, 0666)
+
+	DBFile, err := os.Open(fileDir)
 
 	if err != nil {
-		return os.Create(fileDir)
+		return nil, err
 	}
-
-	return file, nil
+	return DBFile, nil
 }

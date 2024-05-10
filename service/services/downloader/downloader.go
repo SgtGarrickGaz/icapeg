@@ -7,11 +7,11 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
+	"icapeg/config"
 	utils "icapeg/consts"
 	"io"
 	"net/http"
 	"net/textproto"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -154,13 +154,8 @@ func (e *Downloader) ISTagValue() string {
 
 // returns true if hash found else returns false
 func checkHashInFile(targetValue string) (bool, error) {
-	file, err := os.Open("./hashlist.txt")
 
-	if err != nil {
-		return false, err
-	}
-
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(config.DBFile)
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -170,13 +165,17 @@ func checkHashInFile(targetValue string) (bool, error) {
 
 		// compares the two hashes and returns 1 if they match else it returns 0
 		if subtle.ConstantTimeCompare([]byte(trimmedLine), []byte(targetValue)) == 1 {
+			config.DBFile.Seek(0, io.SeekStart)
+
 			return true, nil
 		}
 
 		if err := scanner.Err(); err != nil {
+			config.DBFile.Seek(0, io.SeekStart)
 			return false, err
 		}
 
 	}
+	config.DBFile.Seek(0, io.SeekStart)
 	return false, nil
 }

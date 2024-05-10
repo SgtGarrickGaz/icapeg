@@ -2,12 +2,15 @@ package config
 
 import (
 	"fmt"
+	"icapeg/database"
 	"icapeg/logging"
 	"icapeg/readValues"
 	"os"
 
 	"github.com/spf13/viper"
 )
+
+var DBFile *os.File
 
 type serviceIcapInfo struct {
 	Vendor         string
@@ -38,6 +41,9 @@ var AppCfg AppConfig
 
 // Init initializes the configuration
 func Init() {
+	DBFile, _ = database.NewDatabase("./hashlist.txt")
+	logging.Logger.Info("hash DB has been loaded")
+
 	viper.SetConfigName("config")
 	viper.SetConfigType("toml")
 	viper.AddConfigPath("/etc/icapeg/")
@@ -96,7 +102,7 @@ func Init() {
 			if bypass[i] == "*" {
 				asterisks++
 			}
-			if ext[bypass[i]] == false {
+			if !ext[bypass[i]] {
 				ext[bypass[i]] = true
 			} else {
 				logging.Logger.Fatal("This extension \"" + bypass[i] + "\" was " +
@@ -119,7 +125,7 @@ func Init() {
 			if process[i] == "*" {
 				asterisks++
 			}
-			if ext[process[i]] == false {
+			if !ext[process[i]] {
 				ext[process[i]] = true
 			} else {
 				logging.Logger.Fatal("This extension \"" + process[i] + "\" is stored in multiple arrays")
@@ -140,7 +146,7 @@ func Init() {
 			if reject[i] == "*" {
 				asterisks++
 			}
-			if ext[reject[i]] == false {
+			if !ext[reject[i]] {
 				ext[reject[i]] = true
 			} else {
 				logging.Logger.Fatal("This extension \"" + reject[i] + "\" is stored in multiple arrays")
