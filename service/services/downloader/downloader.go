@@ -32,7 +32,6 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 	msgHeadersBeforeProcessing := d.generalFunc.LogHTTPMsgHeaders(d.methodName)
 	msgHeadersAfterProcessing := make(map[string]interface{})
 	vendorMsgs := make(map[string]interface{})
-	// fmt.Println(d.xICAPMetadata, d.serviceName, "has started")
 
 	if partial {
 		fmt.Println("Partial file found")
@@ -155,7 +154,8 @@ func (e *Downloader) ISTagValue() string {
 // returns true if hash found else returns false
 func checkHashInFile(targetValue string) (bool, error) {
 
-	scanner := bufio.NewScanner(config.DBFile)
+	config.HashFile.Seek(0, io.SeekStart)
+	scanner := bufio.NewScanner(config.HashFile)
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -165,17 +165,13 @@ func checkHashInFile(targetValue string) (bool, error) {
 
 		// compares the two hashes and returns 1 if they match else it returns 0
 		if subtle.ConstantTimeCompare([]byte(trimmedLine), []byte(targetValue)) == 1 {
-			config.DBFile.Seek(0, io.SeekStart)
-
 			return true, nil
 		}
 
 		if err := scanner.Err(); err != nil {
-			config.DBFile.Seek(0, io.SeekStart)
 			return false, err
 		}
 
 	}
-	config.DBFile.Seek(0, io.SeekStart)
 	return false, nil
 }

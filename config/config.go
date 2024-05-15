@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var DBFile *os.File
+var HashFile *os.File
 
 type serviceIcapInfo struct {
 	Vendor         string
@@ -41,9 +41,6 @@ var AppCfg AppConfig
 
 // Init initializes the configuration
 func Init() {
-	DBFile, _ = database.NewDatabase("./hashlist.txt")
-	logging.Logger.Info("hash DB has been loaded")
-
 	viper.SetConfigName("config")
 	viper.SetConfigType("toml")
 	viper.AddConfigPath("/etc/icapeg/")
@@ -62,6 +59,8 @@ func Init() {
 	}
 	logging.InitializeLogger(AppCfg.LogLevel, AppCfg.WriteLogsToConsole)
 	logging.Logger.Info("Reading config.toml file")
+	HashFile, _ = database.NewDatabase(readValues.ReadValuesString("app.hash_list"))
+	logging.Logger.Info("hash DB has been loaded")
 
 	//this loop to make sure that all services in the array of services has sections in the config file and from request mode and response mode
 	//there is one at least from them are enabled in every service
