@@ -31,8 +31,8 @@ type ICAPRequest struct {
 	vendor                 string
 	optionsReqHeaders      map[string]interface{}
 	optionsRespHeaders     map[string]interface{}
-	generalReqHeaders      map[string]interface{}
-	generalRespHeaders     map[string]interface{}
+	GeneralReqHeaders      map[string]interface{}
+	GeneralRespHeaders     map[string]interface{}
 }
 
 // NewICAPRequest is a func to create a new instance from struct IcapRequest yo handle upcoming ICAP requests
@@ -139,7 +139,7 @@ func (i *ICAPRequest) RequestProcessing(xICAPMetadata string) {
 				} else {
 					i.req.OrgRequest = new
 				}
-				body, _ := ioutil.ReadAll(i.req.Request.Body)
+				body, _ := io.ReadAll(i.req.Request.Body)
 				i.req.OrgRequest.Body = io.NopCloser(bytes.NewBuffer(body))
 				i.req.OrgRequest.Header = i.req.Request.Header
 				i.req.OrgRequest.Header.Set(utils.ContentLength, strconv.Itoa(len(body)))
@@ -182,7 +182,7 @@ func (i *ICAPRequest) RequestProcessing(xICAPMetadata string) {
 	//for reqmod and respmod
 	default:
 		logging.Logger.Debug(utils.PrepareLogMsg(xICAPMetadata, "Response or Request mode"))
-		i.generalReqHeaders = i.LogICAPReqHeaders()
+		i.GeneralReqHeaders = i.LogICAPReqHeaders()
 		i.RespAndReqMods(partial, xICAPMetadata)
 	}
 
@@ -308,20 +308,21 @@ func (i *ICAPRequest) RespAndReqMods(partial bool, xICAPMetadata string) {
 
 func (i *ICAPRequest) allHeaders(IcapStatusCode int, httpMshHeadersBeforeProcessing map[string]interface{},
 	httpMshHeadersAfterProcessing map[string]interface{}, vendorMsgs map[string]interface{}, xICAPMetadata string) {
-	i.generalRespHeaders = i.LogICAPResHeaders(IcapStatusCode)
+	i.GeneralRespHeaders = i.LogICAPResHeaders(IcapStatusCode)
+
 	generalReqResp := make(map[string]interface{})
 	generalReqResp["Vendor-Messages"] = vendorMsgs
-	i.generalReqHeaders["HTTP-Message"] = httpMshHeadersBeforeProcessing
+	i.GeneralReqHeaders["HTTP-Message"] = httpMshHeadersBeforeProcessing
 	if IcapStatusCode == utils.OkStatusCodeStr {
-		i.generalRespHeaders["HTTP-Message"] = httpMshHeadersAfterProcessing
+		i.GeneralRespHeaders["HTTP-Message"] = httpMshHeadersAfterProcessing
 	}
 	if i.methodName == utils.ICAPModeReq {
-		generalReqResp["ICAP-REQMOD-Request"] = i.generalReqHeaders
-		generalReqResp["ICAP-REQMOD-Response"] = i.generalRespHeaders
+		generalReqResp["ICAP-REQMOD-Request"] = i.GeneralReqHeaders
+		generalReqResp["ICAP-REQMOD-Response"] = i.GeneralRespHeaders
 
 	} else {
-		generalReqResp["ICAP-RESPMOD-Request"] = i.generalReqHeaders
-		generalReqResp["ICAP-RESPMOD-Response"] = i.generalRespHeaders
+		generalReqResp["ICAP-RESPMOD-Request"] = i.GeneralReqHeaders
+		generalReqResp["ICAP-RESPMOD-Response"] = i.GeneralRespHeaders
 	}
 	jsonHeaders, _ := json.Marshal(generalReqResp)
 	final := string(jsonHeaders)
@@ -479,7 +480,7 @@ func (i *ICAPRequest) optionsMode(serviceName, xICAPMetadata string) {
 	i.h.Set("Allow", "204")
 	// Add preview if preview_enabled is true in config.go
 	previewEnabled, previewBytes := i.servicePreview()
-	if previewEnabled == true {
+	if previewEnabled {
 		if pb, _ := strconv.Atoi(previewBytes); pb >= 0 {
 			i.h.Set("Preview", previewBytes)
 		}

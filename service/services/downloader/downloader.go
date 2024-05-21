@@ -7,6 +7,8 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
+
+	// "icapeg/api"
 	"icapeg/config"
 	utils "icapeg/consts"
 	"io"
@@ -32,11 +34,11 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 	msgHeadersBeforeProcessing := d.generalFunc.LogHTTPMsgHeaders(d.methodName)
 	msgHeadersAfterProcessing := make(map[string]interface{})
 	vendorMsgs := make(map[string]interface{})
-
 	if partial {
-		fmt.Println("Partial file found")
+		// fmt.Println("Partial file found")
 		return utils.Continue, nil, nil, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 	}
+	// fmt.Println(d.httpMsg.Request.Header)
 
 	// Copies the file to the buffer and calculates the file size.
 	file, reqContentType, err := d.generalFunc.CopyingFileToTheBuffer(d.methodName)
@@ -110,7 +112,7 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 
 		// If the file is an ICAP RESPMOD.
 		if d.methodName == utils.ICAPModeResp {
-
+			fmt.Println("Unauthorized download:", IcapHeader.Get("X-Client-Ip"), "File Hash:", fileHash)
 			//creates the error page and adds that in the Response Body
 			errPage := d.generalFunc.GenHtmlPage(utils.BlockPagePath, utils.ErrPageReasonAccessProhibited, d.serviceName, fileHash, d.httpMsg.Request.RequestURI, "4096", d.xICAPMetadata)
 			d.httpMsg.Response = d.generalFunc.ErrPageResp(403, errPage.Len())
@@ -120,7 +122,7 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 				msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 
 		} else {
-			fmt.Println("Unauthorized access:", d.httpMsg.Request.RemoteAddr, "File Hash:", fileHash)
+			fmt.Println("Unauthorized upload:", IcapHeader.Get("X-Client-Ip"), "File Hash:", fileHash)
 			htmlPage, req, err := d.generalFunc.ReqModErrPage(utils.ErrPageReasonAccessProhibited, d.serviceName, fileHash, "4096")
 
 			if err != nil {
