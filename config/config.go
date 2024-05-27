@@ -61,6 +61,8 @@ func Init() {
 	logging.InitializeLogger(AppCfg.LogLevel, AppCfg.WriteLogsToConsole)
 	logging.Logger.Info("Reading config.toml file")
 
+	logging.InitViolationLogger("warn", false)
+
 	// loads the hash db and ip whitelist db for downloader service
 	HashFile, _ = database.NewDatabase(readValues.ReadValuesString("app.hash_list"))
 	logging.Logger.Info("hash DB has been loaded")

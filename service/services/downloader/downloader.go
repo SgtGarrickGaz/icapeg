@@ -11,6 +11,7 @@ import (
 	// "icapeg/api"
 	"icapeg/config"
 	utils "icapeg/consts"
+	"icapeg/logging"
 	"io"
 	"net/http"
 	"net/textproto"
@@ -49,7 +50,7 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 	clientIP := IcapHeader.Get("X-Client-Ip")
 	whiteListed, _ := checkIPWhitelist(clientIP)
 	if whiteListed {
-		// fmt.Printf("IP %v is whitelisted", clientIP)
+		fmt.Printf("IP %v is whitelisted", clientIP)
 		return utils.NoModificationStatusCodeStr, d.generalFunc.ReturningHttpMessageWithFile(d.methodName, file.Bytes()), serviceHeaders, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 	}
 
@@ -118,10 +119,11 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 	// If hash is found in file.
 	if isBlocked {
 		fmt.Println("Hash found")
-
+		logging.ViolationLogger.Info("Hash found: " + fileHash)
 		// If the file is an ICAP RESPMOD.
 		if d.methodName == utils.ICAPModeResp {
-			fmt.Println("Unauthorized download:", IcapHeader.Get("X-Client-Ip"), "File Hash:", fileHash)
+			// fmt.Println("Unauthorized download: ", IcapHeader.Get("X-Client-Ip"), "File Hash: ", fileHash)
+			logging.ViolationLogger.Info("Unauthorized download: " + IcapHeader.Get("X-Client-Ip") + " File Hash: " + fileHash)
 			//creates the error page and adds that in the Response Body
 			errPage := d.generalFunc.GenHtmlPage(utils.BlockPagePath, utils.ErrPageReasonAccessProhibited, d.serviceName, fileHash, d.httpMsg.Request.RequestURI, "4096", d.xICAPMetadata)
 			d.httpMsg.Response = d.generalFunc.ErrPageResp(utils.ForbiddenResourceCodeStr, errPage.Len())
@@ -131,7 +133,8 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 				msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 
 		} else {
-			fmt.Println("Unauthorized upload:", IcapHeader.Get("X-Client-Ip"), "File Hash:", fileHash)
+			// fmt.Println("Unauthorized upload: ", IcapHeader.Get("X-Client-Ip"), "File Hash: ", fileHash)
+			logging.ViolationLogger.Info("Unauthorized upload: " + IcapHeader.Get("X-Client-Ip") + " File Hash: " + fileHash)
 			htmlPage, req, err := d.generalFunc.ReqModErrPage(utils.ErrPageReasonAccessProhibited, d.serviceName, fileHash, "4096")
 
 			if err != nil {
