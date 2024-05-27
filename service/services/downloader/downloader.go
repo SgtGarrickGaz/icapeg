@@ -34,6 +34,7 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 	msgHeadersBeforeProcessing := d.generalFunc.LogHTTPMsgHeaders(d.methodName)
 	msgHeadersAfterProcessing := make(map[string]interface{})
 	vendorMsgs := make(map[string]interface{})
+
 	if partial {
 		// fmt.Println("Partial file found")
 		return utils.Continue, nil, nil, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
@@ -43,6 +44,14 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 	// Copies the file to the buffer and calculates the file size.
 	file, reqContentType, err := d.generalFunc.CopyingFileToTheBuffer(d.methodName)
 	fileSize := fmt.Sprintf("%v", file.Len())
+
+	//Gets the client IP and checks if it is whitelisted and if true allows the request.
+	clientIP := IcapHeader.Get("X-Client-Ip")
+	whiteListed, _ := checkIPWhitelist(clientIP)
+	if whiteListed {
+		// fmt.Printf("IP %v is whitelisted", clientIP)
+		return utils.NoModificationStatusCodeStr, d.generalFunc.ReturningHttpMessageWithFile(d.methodName, file.Bytes()), serviceHeaders, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
+	}
 
 	// If Error exists, return 500 status code
 	if err != nil {
@@ -103,7 +112,7 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 
 	// If there is an error opening the hash list file
 	if fileOpeningError != nil {
-		return 204, d.generalFunc.ReturningHttpMessageWithFile(d.methodName, nil), serviceHeaders, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
+		return utils.NoModificationStatusCodeStr, d.generalFunc.ReturningHttpMessageWithFile(d.methodName, nil), serviceHeaders, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 	}
 
 	// If hash is found in file.
@@ -115,7 +124,7 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 			fmt.Println("Unauthorized download:", IcapHeader.Get("X-Client-Ip"), "File Hash:", fileHash)
 			//creates the error page and adds that in the Response Body
 			errPage := d.generalFunc.GenHtmlPage(utils.BlockPagePath, utils.ErrPageReasonAccessProhibited, d.serviceName, fileHash, d.httpMsg.Request.RequestURI, "4096", d.xICAPMetadata)
-			d.httpMsg.Response = d.generalFunc.ErrPageResp(403, errPage.Len())
+			d.httpMsg.Response = d.generalFunc.ErrPageResp(utils.ForbiddenResourceCodeStr, errPage.Len())
 			d.httpMsg.Response.Body = io.NopCloser(bytes.NewBuffer(errPage.Bytes()))
 			msgHeadersAfterProcessing = d.generalFunc.LogHTTPMsgHeaders(d.methodName)
 			return utils.OkStatusCodeStr, d.httpMsg.Response, serviceHeaders,
@@ -127,7 +136,7 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 
 			if err != nil {
 				fmt.Println(err.Error())
-				return 403, d.generalFunc.ReturningHttpMessageWithFile(d.methodName, htmlPage.Bytes()), nil,
+				return utils.ForbiddenResourceCodeStr, d.generalFunc.ReturningHttpMessageWithFile(d.methodName, htmlPage.Bytes()), nil,
 					msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 			}
 			req.Body = io.NopCloser(htmlPage)
@@ -144,7 +153,7 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 	msgHeadersAfterProcessing = d.generalFunc.LogHTTPMsgHeaders(d.methodName)
 	fmt.Println("fileHash:", fileHash)
 
-	return 204, d.generalFunc.ReturningHttpMessageWithFile(d.methodName, scannedFile), serviceHeaders, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
+	return utils.NoModificationStatusCodeStr, d.generalFunc.ReturningHttpMessageWithFile(d.methodName, scannedFile), serviceHeaders, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 
 }
 
@@ -167,6 +176,30 @@ func checkHashInFile(targetValue string) (bool, error) {
 
 		// compares the two hashes and returns 1 if they match else it returns 0
 		if subtle.ConstantTimeCompare([]byte(trimmedLine), []byte(targetValue)) == 1 {
+			return true, nil
+		}
+
+		if err := scanner.Err(); err != nil {
+			return false, err
+		}
+
+	}
+	return false, nil
+}
+
+func checkIPWhitelist(clientIP string) (bool, error) {
+
+	config.IPWhiteList.Seek(0, io.SeekStart)
+	scanner := bufio.NewScanner(config.IPWhiteList)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		trimmedLine := strings.TrimSpace(line)
+		trimmedLine = strings.ToLower(trimmedLine)
+		clientIP = strings.ToLower(clientIP)
+
+		// compares the two hashes and returns 1 if they match else it returns 0
+		if subtle.ConstantTimeCompare([]byte(trimmedLine), []byte(clientIP)) == 1 {
 			return true, nil
 		}
 

@@ -25,6 +25,7 @@ const (
 	RequestTimeOutStatusCodeStr       = 408
 	MethodNotAllowedForServiceCodeStr = 405
 	ICAPServiceNotFoundCodeStr        = 404
+	ForbiddenResourceCodeStr          = 403
 	HeaderEncapsulated                = "Encapsulated"
 	ICAPPrefix                        = "icap_"
 	NoVendor                          = "none"

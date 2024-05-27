@@ -31,3 +31,4 @@ app.env
 .vscode
 
 hashlist.txt
+whitelist.txt

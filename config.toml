@@ -20,6 +20,7 @@ title = "ICAP configuration file"
 [app]
 port = 1344
 hash_list = "./hashlist.txt"
+ip_whitelist = "./whitelist.txt"
 log_level="debug"
 write_logs_to_console= false
 services= ["echo", "clhashlookup", "clamav", "downloader"]
