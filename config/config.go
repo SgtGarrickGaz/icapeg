@@ -12,6 +12,7 @@ import (
 
 var HashFile *os.File
 var IPWhiteList *os.File
+var WatchList *os.File
 
 type serviceIcapInfo struct {
 	Vendor         string
@@ -61,7 +62,7 @@ func Init() {
 	logging.InitializeLogger(AppCfg.LogLevel, AppCfg.WriteLogsToConsole)
 	logging.Logger.Info("Reading config.toml file")
 
-	logging.InitViolationLogger("warn", false)
+	logging.InitViolationLogger("warn")
 
 	// loads the hash db and ip whitelist db for downloader service
 	HashFile, _ = database.NewDatabase(readValues.ReadValuesString("app.hash_list"))
@@ -69,6 +70,9 @@ func Init() {
 
 	IPWhiteList, _ = database.NewDatabase(readValues.ReadValuesString("app.ip_whitelist"))
 	logging.Logger.Info("IP DB has been loaded")
+
+	WatchList, _ = database.NewDatabase(readValues.ReadValuesString("app.watchlist"))
+	logging.Logger.Info("Watchlist DB has been loaded")
 
 	//this loop to make sure that all services in the array of services has sections in the config file and from request mode and response mode
 	//there is one at least from them are enabled in every service

@@ -20,6 +20,7 @@ type Downloader struct {
 	//elapsed                    time.Duration
 	serviceName                string
 	methodName                 string
+	watchlistDir               string
 	maxFileSize                int
 	bypassExts                 []string
 	processExts                []string
@@ -34,6 +35,7 @@ func InitDownloadConfig(serviceName string) {
 	logging.Logger.Debug("loading " + serviceName + " service configurations")
 	doOnce.Do(func() {
 		DownloaderConfig = &Downloader{
+			watchlistDir:               readValues.ReadValuesString(serviceName + ".watchlist_dir"),
 			maxFileSize:                readValues.ReadValuesInt(serviceName + ".max_filesize"),
 			bypassExts:                 readValues.ReadValuesSlice(serviceName + ".bypass_extensions"),
 			processExts:                readValues.ReadValuesSlice(serviceName + ".process_extensions"),
@@ -53,6 +55,7 @@ func NewDownloaderService(serviceName, methodName string, httpMsg *http_message.
 		serviceName:                serviceName,
 		methodName:                 methodName,
 		generalFunc:                general_functions.NewGeneralFunc(httpMsg, xICAPMetadata),
+		watchlistDir:               DownloaderConfig.watchlistDir,
 		maxFileSize:                DownloaderConfig.maxFileSize,
 		bypassExts:                 DownloaderConfig.bypassExts,
 		processExts:                DownloaderConfig.processExts,

@@ -32,3 +32,9 @@ app.env
 
 hashlist.txt
 whitelist.txt
+watchlist.txt
+
+watchlist/
+
+start.sh
+test.sh
