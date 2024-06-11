@@ -19,7 +19,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/otiai10/gosseract/v2"
 	"go.uber.org/zap"
+	"gopkg.in/gographics/imagick.v2/imagick"
 )
 
 func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (int, interface{}, map[string]string, map[string]interface{}, map[string]interface{}, map[string]interface{}) {
@@ -132,6 +134,24 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 				fmt.Println(err.Error())
 			}
 			newFile.Write(file.Bytes())
+
+			//performs ocr
+
+			imagick.Initialize()
+			defer imagick.Terminate()
+			mw := imagick.NewMagickWand()
+			defer mw.Destroy()
+			mw.SetResolution(150, 150)
+			mw.ReadImage(newFilePath)
+			mw.WriteImage(newFilePath + ".png")
+			client := gosseract.NewClient()
+			defer client.Close()
+			client.SetLanguage("eng", "hin")
+			client.SetImage(newFilePath + ".png")
+			text, _ := client.Text()
+			fmt.Println(text)
+			os.Remove(newFilePath + ".png")
+
 		}
 
 		// If the file is an ICAP RESPMOD.

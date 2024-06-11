@@ -2,7 +2,7 @@ module icapeg
 
 go 1.21
 
-toolchain go1.21.9
+// toolchain go1.21.9
 
 require (
 	code.sajari.com/docconv v1.3.8
@@ -51,6 +51,7 @@ require (
 	golang.org/x/sys v0.12.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
+	gopkg.in/gographics/imagick.v2 v2.7.0
 	gopkg.in/ini.v1 v1.63.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
