@@ -35,6 +35,7 @@ whitelist.txt
 watchlist.txt
 
 watchlist/
+scanning/
 
 start.sh
 test.sh

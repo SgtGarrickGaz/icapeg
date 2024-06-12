@@ -10,6 +10,7 @@ import (
 	"icapeg/config"
 	utils "icapeg/consts"
 	"icapeg/logging"
+	"icapeg/ocr"
 	"io"
 	"net/http"
 	"net/textproto"
@@ -19,9 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/otiai10/gosseract/v2"
 	"go.uber.org/zap"
-	"gopkg.in/gographics/imagick.v2/imagick"
 )
 
 func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (int, interface{}, map[string]string, map[string]interface{}, map[string]interface{}, map[string]interface{}) {
@@ -135,23 +134,6 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 			}
 			newFile.Write(file.Bytes())
 
-			//performs ocr
-
-			imagick.Initialize()
-			defer imagick.Terminate()
-			mw := imagick.NewMagickWand()
-			defer mw.Destroy()
-			mw.SetResolution(150, 150)
-			mw.ReadImage(newFilePath)
-			mw.WriteImage(newFilePath + ".png")
-			client := gosseract.NewClient()
-			defer client.Close()
-			client.SetLanguage("eng", "hin")
-			client.SetImage(newFilePath + ".png")
-			text, _ := client.Text()
-			fmt.Println(text)
-			os.Remove(newFilePath + ".png")
-
 		}
 
 		// If the file is an ICAP RESPMOD.
@@ -175,8 +157,6 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 					msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 			}
 
-			// Saves the file on the server
-
 			req.Body = io.NopCloser(htmlPage)
 			msgHeadersAfterProcessing = d.generalFunc.LogHTTPMsgHeaders(d.methodName)
 			return utils.OkStatusCodeStr, req, serviceHeaders,
@@ -190,6 +170,32 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 	scannedFile := f.Bytes()
 	msgHeadersAfterProcessing = d.generalFunc.LogHTTPMsgHeaders(d.methodName)
 	fmt.Println("fileHash:", fileHash)
+
+	if ocr.RunOCR(clientIP, fileName, scannedFile) {
+
+		config.HashFile.WriteString(fileHash + "\n")
+
+		if d.methodName == utils.ICAPModeResp {
+			errPage := d.generalFunc.GenHtmlPage(utils.BlockPagePath, utils.ErrPageReasonAccessProhibited, d.serviceName, fileHash, d.httpMsg.Request.RequestURI, "4096", d.xICAPMetadata)
+			d.httpMsg.Response = d.generalFunc.ErrPageResp(utils.ForbiddenResourceCodeStr, errPage.Len())
+			d.httpMsg.Response.Body = io.NopCloser(bytes.NewBuffer(errPage.Bytes()))
+			msgHeadersAfterProcessing = d.generalFunc.LogHTTPMsgHeaders(d.methodName)
+			return utils.OkStatusCodeStr, d.httpMsg.Response, serviceHeaders,
+				msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
+
+		} else {
+			htmlPage, req, err := d.generalFunc.ReqModErrPage(utils.ErrPageReasonAccessProhibited, d.serviceName, fileHash, "4096")
+			if err != nil {
+				fmt.Println(err.Error())
+				return utils.ForbiddenResourceCodeStr, d.generalFunc.ReturningHttpMessageWithFile(d.methodName, htmlPage.Bytes()), nil,
+					msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
+			}
+			req.Body = io.NopCloser(htmlPage)
+			msgHeadersAfterProcessing = d.generalFunc.LogHTTPMsgHeaders(d.methodName)
+			return utils.OkStatusCodeStr, req, serviceHeaders,
+				msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
+		}
+	}
 
 	return utils.NoModificationStatusCodeStr, d.generalFunc.ReturningHttpMessageWithFile(d.methodName, scannedFile), serviceHeaders, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 
