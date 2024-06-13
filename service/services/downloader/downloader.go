@@ -7,10 +7,11 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
-	"icapeg/config"
 	utils "icapeg/consts"
+	"icapeg/database"
 	"icapeg/logging"
 	"icapeg/ocr"
+	"icapeg/readValues"
 	"io"
 	"net/http"
 	"net/textproto"
@@ -40,6 +41,12 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 	msgHeadersAfterProcessing := make(map[string]interface{})
 	vendorMsgs := make(map[string]interface{})
 
+	hashFile, _ := database.NewDatabase(readValues.ReadValuesString("app.hash_list"))
+
+	ipWhiteList, _ := database.NewDatabase(readValues.ReadValuesString("app.ip_whitelist"))
+
+	watchList, _ := database.NewDatabase(readValues.ReadValuesString("app.watchlist"))
+
 	if partial {
 		return utils.Continue, nil, nil, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 	}
@@ -64,7 +71,7 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 
 	//Gets the client IP and checks if it is whitelisted and if true allows the request.
 	clientIP := IcapHeader.Get("X-Client-Ip")
-	whiteListed, _ := checkIPWhitelist(clientIP)
+	whiteListed, _ := checkIPWhitelist(clientIP, ipWhiteList)
 	if whiteListed {
 		return utils.NoModificationStatusCodeStr, d.generalFunc.ReturningHttpMessageWithFile(d.methodName, file.Bytes()), serviceHeaders, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 	}
@@ -111,7 +118,7 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 	}
 
 	//  Checks the hash of the file.
-	var isBlocked, scannerError = checkHashInFile(fileHash)
+	var isBlocked, scannerError = checkHashInFile(fileHash, hashFile)
 
 	// If there is an error opening the hash list file
 	if scannerError != nil {
@@ -124,7 +131,7 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 		// logging.ViolationLogger.Info("Hash found: " + fileHash)
 
 		// If watchlist, save the file to the server
-		if watchList(clientIP) {
+		if checkWatchList(clientIP, watchList) {
 			os.Mkdir(d.watchlistDir+"/"+clientIP, os.ModePerm)
 			path := filepath.Join(d.watchlistDir, clientIP, fileName)
 			newFilePath := filepath.FromSlash(path)
@@ -173,7 +180,7 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 
 	if ocr.RunOCR(clientIP, fileName, scannedFile) {
 
-		config.HashFile.WriteString(fileHash + "\n")
+		hashFile.WriteString(fileHash + "\n")
 
 		if d.methodName == utils.ICAPModeResp {
 			errPage := d.generalFunc.GenHtmlPage(utils.BlockPagePath, utils.ErrPageReasonAccessProhibited, d.serviceName, fileHash, d.httpMsg.Request.RequestURI, "4096", d.xICAPMetadata)
@@ -207,10 +214,10 @@ func (e *Downloader) ISTagValue() string {
 }
 
 // returns true if hash found else returns false
-func checkHashInFile(targetValue string) (bool, error) {
+func checkHashInFile(targetValue string, hashFile *os.File) (bool, error) {
 
-	config.HashFile.Seek(0, io.SeekStart)
-	scanner := bufio.NewScanner(config.HashFile)
+	hashFile.Seek(0, io.SeekStart)
+	scanner := bufio.NewScanner(hashFile)
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -231,10 +238,10 @@ func checkHashInFile(targetValue string) (bool, error) {
 	return false, nil
 }
 
-func checkIPWhitelist(clientIP string) (bool, error) {
+func checkIPWhitelist(clientIP string, ipWhiteList *os.File) (bool, error) {
 
-	config.IPWhiteList.Seek(0, io.SeekStart)
-	scanner := bufio.NewScanner(config.IPWhiteList)
+	ipWhiteList.Seek(0, io.SeekStart)
+	scanner := bufio.NewScanner(ipWhiteList)
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -255,10 +262,9 @@ func checkIPWhitelist(clientIP string) (bool, error) {
 	return false, nil
 }
 
-func watchList(clientIP string) bool {
-	config.WatchList.Seek(0, io.SeekStart)
-
-	scanner := bufio.NewScanner(config.WatchList)
+func checkWatchList(clientIP string, watchList *os.File) bool {
+	watchList.Seek(0, io.SeekStart)
+	scanner := bufio.NewScanner(watchList)
 
 	for scanner.Scan() {
 		line := scanner.Text()

@@ -11,6 +11,7 @@ import (
 )
 
 func RunOCR(clientIP string, fileName string, scannedFile []byte) bool {
+	fmt.Println("Scanning the file")
 	os.Mkdir("scanning/"+clientIP, os.ModePerm)
 	path := filepath.Join("scanning/", clientIP, fileName)
 	scanFilePath := filepath.FromSlash(path)
@@ -37,5 +38,7 @@ func RunOCR(clientIP string, fileName string, scannedFile []byte) bool {
 	os.Remove(scanFilePath + ".png")
 	os.Remove(scanFilePath)
 
-	return strings.Contains(text, "Gandhi")
+	isBlocked := strings.Contains(text, "Gandhi")
+	fmt.Println(isBlocked)
+	return isBlocked
 }
