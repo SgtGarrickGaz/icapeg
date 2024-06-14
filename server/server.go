@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"syscall"
 	"time"
@@ -22,6 +23,8 @@ import (
 func StartServer() error {
 	// any request even the service doesn't exist in toml file, it will go to api.ToICAPEGServe
 	// and there, the request will be filtered to check if the service exists or not
+
+	runtime.GOMAXPROCS(0)
 
 	config.Init()
 

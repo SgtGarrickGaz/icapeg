@@ -11,7 +11,6 @@ import (
 	"icapeg/database"
 	"icapeg/logging"
 	"icapeg/ocr"
-	"icapeg/readValues"
 	"io"
 	"net/http"
 	"net/textproto"
@@ -41,12 +40,6 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 	msgHeadersAfterProcessing := make(map[string]interface{})
 	vendorMsgs := make(map[string]interface{})
 
-	hashFile, _ := database.NewDatabase(readValues.ReadValuesString("app.hash_list"))
-
-	ipWhiteList, _ := database.NewDatabase(readValues.ReadValuesString("app.ip_whitelist"))
-
-	watchList, _ := database.NewDatabase(readValues.ReadValuesString("app.watchlist"))
-
 	if partial {
 		return utils.Continue, nil, nil, msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 	}
@@ -70,6 +63,11 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 	}
 
 	//Gets the client IP and checks if it is whitelisted and if true allows the request.
+	ipWhiteList, err := database.NewDatabase(d.ipWhiteListDB)
+	if err != nil {
+		panic(err.Error())
+	}
+
 	clientIP := IcapHeader.Get("X-Client-Ip")
 	whiteListed, _ := checkIPWhitelist(clientIP, ipWhiteList)
 	if whiteListed {
@@ -118,6 +116,11 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 	}
 
 	//  Checks the hash of the file.
+	hashFile, err := database.NewDatabase(d.hashDB)
+
+	if err != nil {
+		panic(err.Error())
+	}
 	var isBlocked, scannerError = checkHashInFile(fileHash, hashFile)
 
 	// If there is an error opening the hash list file
@@ -131,6 +134,10 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 		// logging.ViolationLogger.Info("Hash found: " + fileHash)
 
 		// If watchlist, save the file to the server
+		watchList, err := database.NewDatabase(d.watchListDB)
+		if err != nil {
+			panic(err.Error())
+		}
 		if checkWatchList(clientIP, watchList) {
 			os.Mkdir(d.watchlistDir+"/"+clientIP, os.ModePerm)
 			path := filepath.Join(d.watchlistDir, clientIP, fileName)
@@ -160,7 +167,7 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 
 			if err != nil {
 				fmt.Println(err.Error())
-				return utils.ForbiddenResourceCodeStr, d.generalFunc.ReturningHttpMessageWithFile(d.methodName, htmlPage.Bytes()), nil,
+				return utils.OkStatusCodeStr, d.generalFunc.ReturningHttpMessageWithFile(d.methodName, nil), nil,
 					msgHeadersBeforeProcessing, msgHeadersAfterProcessing, vendorMsgs
 			}
 
@@ -176,7 +183,7 @@ func (d *Downloader) Processing(partial bool, IcapHeader textproto.MIMEHeader) (
 	// default return case
 	scannedFile := f.Bytes()
 	msgHeadersAfterProcessing = d.generalFunc.LogHTTPMsgHeaders(d.methodName)
-	fmt.Println("fileHash:", fileHash)
+	// fmt.Println("fileHash:", fileHash)
 
 	if ocr.RunOCR(clientIP, fileName, scannedFile) {
 

@@ -19,9 +19,6 @@ title = "ICAP configuration file"
 
 [app]
 port = 1344
-hash_list = "./hashlist.txt"
-ip_whitelist = "./whitelist.txt"
-watchlist = "./watchlist.txt"
 log_level="debug"
 write_logs_to_console= false
 services= ["echo", "clhashlookup", "clamav", "downloader"]
@@ -109,6 +106,9 @@ process_extensions = ["pdf"] # * = everything except the ones in bypass, unknown
 reject_extensions = []
 bypass_extensions = ["*"]
 watchlist_dir = "./watchlist"
+hash_list_db = "./hashlist.txt"
+ip_whitelist_db = "./whitelist.txt"
+watchlist_db = "./watchlist.txt"
 #max file size value from 1 to 9223372036854775807, and value of zero means unlimited
 max_filesize = 0 #bytes
 return_original_if_max_file_size_exceeded=true

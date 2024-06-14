@@ -26,6 +26,9 @@ type Downloader struct {
 	processExts                []string
 	rejectExts                 []string
 	extArrs                    []services_utilities.Extension
+	hashDB                     string
+	ipWhiteListDB              string
+	watchListDB                string
 	returnOrigIfMaxSizeExc     bool
 	return400IfFileExtRejected bool
 	generalFunc                *general_functions.GeneralFunc
@@ -40,6 +43,9 @@ func InitDownloadConfig(serviceName string) {
 			bypassExts:                 readValues.ReadValuesSlice(serviceName + ".bypass_extensions"),
 			processExts:                readValues.ReadValuesSlice(serviceName + ".process_extensions"),
 			rejectExts:                 readValues.ReadValuesSlice(serviceName + ".reject_extensions"),
+			hashDB:                     readValues.ReadValuesString(serviceName + ".hash_list_db"),
+			ipWhiteListDB:              readValues.ReadValuesString(serviceName + ".ip_whitelist_db"),
+			watchListDB:                readValues.ReadValuesString(serviceName + ".watchlist_db"),
 			returnOrigIfMaxSizeExc:     readValues.ReadValuesBool(serviceName + ".return_original_if_max_file_size_exceeded"),
 			return400IfFileExtRejected: readValues.ReadValuesBool(serviceName + ".return_400_if_file_ext_rejected"),
 		}
@@ -60,6 +66,9 @@ func NewDownloaderService(serviceName, methodName string, httpMsg *http_message.
 		bypassExts:                 DownloaderConfig.bypassExts,
 		processExts:                DownloaderConfig.processExts,
 		rejectExts:                 DownloaderConfig.rejectExts,
+		hashDB:                     DownloaderConfig.hashDB,
+		ipWhiteListDB:              DownloaderConfig.ipWhiteListDB,
+		watchListDB:                DownloaderConfig.watchListDB,
 		extArrs:                    DownloaderConfig.extArrs,
 		returnOrigIfMaxSizeExc:     DownloaderConfig.returnOrigIfMaxSizeExc,
 		return400IfFileExtRejected: DownloaderConfig.return400IfFileExtRejected,
